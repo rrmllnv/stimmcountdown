@@ -2,7 +2,7 @@ local mod = get_mod("StimmCountdown")
 
 local UIWidget = require("scripts/managers/ui/ui_widget")
 local UIHudSettings = require("scripts/settings/ui/ui_hud_settings")
-
+local UIFontSettings = require("scripts/managers/ui/ui_font_settings")
 
 -- Константы
 local STIMM_BUFF_NAME = "syringe_broker_buff"
@@ -12,6 +12,46 @@ local STIMM_ABILITY_TYPE = "pocketable_ability"
 -- Цвета из игры
 local ACTIVE_COLOR = UIHudSettings.color_tint_main_1  -- Светлый (как кол-во гранат)
 local COOLDOWN_COLOR = UIHudSettings.color_tint_alert_2  -- Красный
+
+-- Добавляем виджет в определения родителя (как в train_timer)
+local add_definitions = function(definitions)
+	if not definitions then
+		return
+	end
+
+	definitions.scenegraph_definition = definitions.scenegraph_definition or {}
+	definitions.widget_definitions = definitions.widget_definitions or {}
+
+	-- Стиль текста таймера (как гранаты)
+	local stimm_timer_text_style = table.clone(UIFontSettings.hud_body)
+	stimm_timer_text_style.font_type = "machine_medium"
+	stimm_timer_text_style.font_size = 30
+	stimm_timer_text_style.drop_shadow = true
+	stimm_timer_text_style.text_horizontal_alignment = "right"
+	stimm_timer_text_style.text_vertical_alignment = "center"
+	stimm_timer_text_style.text_color = table.clone(COOLDOWN_COLOR)
+	stimm_timer_text_style.offset = { -60, 0, 10 }
+
+	-- Виджет таймера (использует существующий scenegraph "background")
+	definitions.widget_definitions.stimm_timer = UIWidget.create_definition({
+		{
+			visible = false,
+			pass_type = "text",
+			style_id = "text",
+			value = "",
+			value_id = "text",
+			style = stimm_timer_text_style,
+		},
+	}, "background")
+end
+
+-- Хук для добавления виджета в определения
+mod:hook_require(
+	"scripts/ui/hud/elements/player_weapon/hud_element_player_weapon_definitions",
+	function(definitions)
+		add_definitions(definitions)
+	end
+)
 
 -- Проверка, является ли игрок классом Broker (Hive Scum)
 local function is_broker_class(player)
@@ -52,54 +92,19 @@ local function get_buff_remaining_time(buff_extension, buff_template_name)
 	return timer
 end
 
--- Создаем виджет таймера при инициализации HudElementPlayerWeapon для слота стима
-mod:hook_safe("HudElementPlayerWeapon", "init", function(self, parent, draw_layer, start_scale, data)
-	-- Проверяем что это слот стима
-	local slot_component = data and data.slot_component
-	local slot_name = slot_component and slot_component.__name
-
-	if slot_name ~= STIMM_SLOT_NAME then
-		return
-	end
-
-	-- Помечаем что это слот стима
-	self._is_stimm_slot = true
-
-	-- Создаем виджет таймера
-	local timer_widget_definition = UIWidget.create_definition({
-		{
-			pass_type = "text",
-			style_id = "text",
-			value = "",
-			value_id = "text",
-			style = {
-				font_type = "machine_medium",
-				font_size = 30,
-				drop_shadow = true,
-				text_horizontal_alignment = "right",
-				text_vertical_alignment = "center",
-				text_color = table.clone(COOLDOWN_COLOR),
-				offset = { -60, 0, 10 },
-			},
-		},
-	}, "background")
-
-	self._stimm_timer_widget = self:_create_widget("stimm_timer", timer_widget_definition)
-	
-	-- Добавляем виджет в _widgets_by_name чтобы он управлялся родителем (как в train_timer)
-	if not self._widgets_by_name then
-		self._widgets_by_name = {}
-	end
-	self._widgets_by_name.stimm_timer = self._stimm_timer_widget
-end)
-
 -- Обновляем таймер
 mod:hook_safe("HudElementPlayerWeapon", "update", function(self, dt, t, ui_renderer, render_settings, input_service)
-	if not self._is_stimm_slot or not self._stimm_timer_widget then
+	-- Проверяем что это слот стима
+	if self._slot_name ~= STIMM_SLOT_NAME then
 		return
 	end
 
-	local widget = self._stimm_timer_widget
+	-- Получаем виджет из _widgets_by_name (как в train_timer)
+	local widget = self._widgets_by_name and self._widgets_by_name.stimm_timer
+	if not widget then
+		return
+	end
+
 	local data = self._data
 	if not data then
 		widget.content.visible = false
@@ -161,7 +166,7 @@ mod:hook_safe("HudElementPlayerWeapon", "update", function(self, dt, t, ui_rende
 		end
 	end
 
-	-- Скрываем виджет если не должно показываться (устанавливаем alpha = 0 чтобы скрыть уже нарисованный)
+	-- Скрываем виджет если не должно показываться
 	if not should_show then
 		widget.content.text = ""
 		widget.content.visible = false
@@ -186,17 +191,4 @@ mod:hook_safe("HudElementPlayerWeapon", "update", function(self, dt, t, ui_rende
 	widget.style.text.offset[2] = height_offset
 
 	widget.dirty = true
-end)
-
--- Рисуем виджет таймера
-mod:hook_safe("HudElementPlayerWeapon", "_draw_widgets", function(self, dt, t, input_service, ui_renderer, render_settings)
-	if not self._is_stimm_slot or not self._stimm_timer_widget then
-		return
-	end
-
-	local widget = self._stimm_timer_widget
-	-- Рисуем виджет
-	if widget then
-		UIWidget.draw(widget, ui_renderer)
-	end
 end)
