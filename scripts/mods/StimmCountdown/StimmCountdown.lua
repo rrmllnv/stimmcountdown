@@ -13,7 +13,7 @@ local STIMM_ABILITY_TYPE = "pocketable_ability"
 local ACTIVE_COLOR = UIHudSettings.color_tint_main_1  -- Светлый (как кол-во гранат)
 local COOLDOWN_COLOR = UIHudSettings.color_tint_alert_2  -- Красный
 
--- Добавляем виджет в определения родителя (как в train_timer)
+-- Добавляем виджет в определения родителя
 local add_definitions = function(definitions)
 	if not definitions then
 		return
@@ -99,7 +99,7 @@ mod:hook_safe("HudElementPlayerWeapon", "update", function(self, dt, t, ui_rende
 		return
 	end
 
-	-- Получаем виджет из _widgets_by_name (как в train_timer)
+	-- Получаем виджет из _widgets_by_name
 	local widget = self._widgets_by_name and self._widgets_by_name.stimm_timer
 	if not widget then
 		return
@@ -152,6 +152,17 @@ mod:hook_safe("HudElementPlayerWeapon", "update", function(self, dt, t, ui_rende
 		-- Проверяем кулдаун
 		local ability_extension = self._ability_extension
 		if ability_extension then
+			local equipped_abilities = ability_extension:equipped_abilities()
+			local pocketable_ability = equipped_abilities and equipped_abilities[STIMM_ABILITY_TYPE]
+
+			if not pocketable_ability or pocketable_ability.ability_group ~= "broker_syringe" then
+				widget.content.text = ""
+				widget.content.visible = false
+				widget.visible = false
+				widget.dirty = true
+				return
+			end
+
 			local remaining_cooldown = ability_extension:remaining_ability_cooldown(STIMM_ABILITY_TYPE)
 
 			if remaining_cooldown and remaining_cooldown >= 0.05 then
@@ -170,8 +181,7 @@ mod:hook_safe("HudElementPlayerWeapon", "update", function(self, dt, t, ui_rende
 	if not should_show then
 		widget.content.text = ""
 		widget.content.visible = false
-		-- Устанавливаем alpha = 0 чтобы скрыть уже нарисованный виджет
-		widget.style.text.text_color[1] = 0
+		widget.visible = false
 		widget.dirty = true
 		return
 	end
@@ -179,6 +189,7 @@ mod:hook_safe("HudElementPlayerWeapon", "update", function(self, dt, t, ui_rende
 	-- Обновляем виджет
 	widget.content.text = display_text
 	widget.content.visible = true
+	widget.visible = true
 	-- Устанавливаем цвет
 	widget.style.text.text_color[1] = display_color[1]
 	widget.style.text.text_color[2] = display_color[2]
