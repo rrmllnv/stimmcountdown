@@ -135,11 +135,22 @@ mod:hook_safe("HudElementPlayerWeapon", "update", function(self, dt, t, ui_rende
 
 	-- Формат вывода
 	local show_decimals = mod:get("show_decimals") ~= false
+	local show_active = mod:get("show_active") ~= false
+	local show_cooldown = mod:get("show_cooldown") ~= false
+
+	-- Предварительно получаем данные по способностям
+	local ability_extension = self._ability_extension
+	local equipped_abilities = ability_extension and ability_extension:equipped_abilities()
+	local pocketable_ability = equipped_abilities and equipped_abilities[STIMM_ABILITY_TYPE]
+	local has_broker_syringe = pocketable_ability and pocketable_ability.ability_group == "broker_syringe"
+	local remaining_cooldown = has_broker_syringe and ability_extension and ability_extension:remaining_ability_cooldown(STIMM_ABILITY_TYPE)
+	local has_cooldown = remaining_cooldown and remaining_cooldown >= 0.05
 
 	-- Проверяем активный баф стима
 	local remaining_buff_time = get_buff_remaining_time(buff_extension, STIMM_BUFF_NAME)
+	local has_active_buff = remaining_buff_time and remaining_buff_time >= 0.05
 
-	if remaining_buff_time and remaining_buff_time >= 0.05 and mod:get("show_active") ~= false then
+	if show_active and has_active_buff then
 		-- Стим активен
 		if show_decimals then
 			display_text = string.format("%.1f", remaining_buff_time)
@@ -148,32 +159,24 @@ mod:hook_safe("HudElementPlayerWeapon", "update", function(self, dt, t, ui_rende
 		end
 		display_color = ACTIVE_COLOR
 		should_show = true
-	elseif mod:get("show_cooldown") ~= false then
-		-- Проверяем кулдаун
-		local ability_extension = self._ability_extension
-		if ability_extension then
-			local equipped_abilities = ability_extension:equipped_abilities()
-			local pocketable_ability = equipped_abilities and equipped_abilities[STIMM_ABILITY_TYPE]
+	elseif show_cooldown then
+		-- Проверяем кулдаун только для брокер-сиренги
+		if not has_broker_syringe then
+			widget.content.text = ""
+			widget.content.visible = false
+			widget.visible = false
+			widget.dirty = true
+			return
+		end
 
-			if not pocketable_ability or pocketable_ability.ability_group ~= "broker_syringe" then
-				widget.content.text = ""
-				widget.content.visible = false
-				widget.visible = false
-				widget.dirty = true
-				return
+		if has_cooldown then
+			if show_decimals then
+				display_text = string.format("%.1f", remaining_cooldown)
+			else
+				display_text = string.format("%.0f", math.ceil(remaining_cooldown))
 			end
-
-			local remaining_cooldown = ability_extension:remaining_ability_cooldown(STIMM_ABILITY_TYPE)
-
-			if remaining_cooldown and remaining_cooldown >= 0.05 then
-				if show_decimals then
-					display_text = string.format("%.1f", remaining_cooldown)
-				else
-					display_text = string.format("%.0f", math.ceil(remaining_cooldown))
-				end
-				display_color = COOLDOWN_COLOR
-				should_show = true
-			end
+			display_color = COOLDOWN_COLOR
+			should_show = true
 		end
 	end
 
