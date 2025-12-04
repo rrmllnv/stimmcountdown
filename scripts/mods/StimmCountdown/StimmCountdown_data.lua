@@ -24,6 +24,12 @@ return {
 				default_value = true,
 				tooltip = "show_decimals_tooltip",
 			},
+			{
+				setting_id = "show_ready_notification",
+				type = "checkbox",
+				default_value = true,
+				tooltip = "show_ready_notification_tooltip",
+			},
 		},
 	},
 }

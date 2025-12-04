@@ -8,10 +8,12 @@ local UIFontSettings = require("scripts/managers/ui/ui_font_settings")
 local STIMM_BUFF_NAME = "syringe_broker_buff"
 local STIMM_SLOT_NAME = "slot_pocketable_small"
 local STIMM_ABILITY_TYPE = "pocketable_ability"
+local STIMM_ICON_MATERIAL = "content/ui/materials/icons/pocketables/hud/syringe_broker"
 
 -- Цвета из игры
 local ACTIVE_COLOR = UIHudSettings.color_tint_main_1  -- Светлый (как кол-во гранат)
 local COOLDOWN_COLOR = UIHudSettings.color_tint_alert_2  -- Красный
+local READY_ICON_COLOR = UIHudSettings.color_tint_main_2
 
 -- Добавляем виджет в определения родителя
 local add_definitions = function(definitions)
@@ -137,6 +139,7 @@ mod:hook_safe("HudElementPlayerWeapon", "update", function(self, dt, t, ui_rende
 	local show_decimals = mod:get("show_decimals") ~= false
 	local show_active = mod:get("show_active") ~= false
 	local show_cooldown = mod:get("show_cooldown") ~= false
+	local show_ready_notification = mod:get("show_ready_notification") ~= false
 
 	-- Предварительно получаем данные по способностям
 	local ability_extension = self._ability_extension
@@ -145,10 +148,13 @@ mod:hook_safe("HudElementPlayerWeapon", "update", function(self, dt, t, ui_rende
 	local has_broker_syringe = pocketable_ability and pocketable_ability.ability_group == "broker_syringe"
 	local remaining_cooldown = has_broker_syringe and ability_extension and ability_extension:remaining_ability_cooldown(STIMM_ABILITY_TYPE)
 	local has_cooldown = remaining_cooldown and remaining_cooldown >= 0.05
+	local cooldown_known_ready = remaining_cooldown ~= nil and not has_cooldown
 
 	-- Проверяем активный баф стима
 	local remaining_buff_time = get_buff_remaining_time(buff_extension, STIMM_BUFF_NAME)
 	local has_active_buff = remaining_buff_time and remaining_buff_time >= 0.05
+	-- Ready считаем только если знаем кулдаун (remaining_cooldown не nil) и нет бафа
+	local is_ready = has_broker_syringe and cooldown_known_ready and not has_active_buff
 
 	if show_active and has_active_buff then
 		-- Стим активен
@@ -177,6 +183,32 @@ mod:hook_safe("HudElementPlayerWeapon", "update", function(self, dt, t, ui_rende
 			end
 			display_color = COOLDOWN_COLOR
 			should_show = true
+		end
+	end
+
+	-- Уведомление о готовности стима (одноразово на переход из кулдауна в готовность)
+	if show_ready_notification then
+		-- Первое обновление: запоминаем состояние и выходим
+		if self._stimm_ready_prev == nil then
+			self._stimm_ready_prev = is_ready
+			self._stimm_prev_has_cooldown = has_cooldown
+		else
+			local became_ready_after_cooldown = is_ready and not self._stimm_ready_prev and (self._stimm_prev_has_cooldown or has_cooldown)
+
+			if became_ready_after_cooldown then
+				Managers.event:trigger("event_add_notification_message", "custom", {
+					icon = STIMM_ICON_MATERIAL,
+					icon_size = "currency",
+					color = Color.terminal_grid_background(180, true),
+					line_color = Color.terminal_corner_selected(255, true),
+					line_1 = mod:localize("stimm_ready_notification"),
+					icon_color = READY_ICON_COLOR,
+					show_shine = true,
+				})
+			end
+
+			self._stimm_ready_prev = is_ready
+			self._stimm_prev_has_cooldown = has_cooldown
 		end
 	end
 

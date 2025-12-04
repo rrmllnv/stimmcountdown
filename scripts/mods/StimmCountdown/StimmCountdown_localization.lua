@@ -33,4 +33,16 @@ return {
 		en = "Show time with decimal point (e.g. 12.5 instead of 13).",
 		ru = "Показывать время с десятичной точкой (например 12.5 вместо 13).",
 	},
+	show_ready_notification = {
+		en = "Notify when stimm is ready",
+		ru = "Уведомлять когда стим готов",
+	},
+	show_ready_notification_tooltip = {
+		en = "Show a notification when the stimm syringe is ready to use.",
+		ru = "Показывать уведомление когда стим готов к использованию.",
+	},
+	stimm_ready_notification = {
+		en = "Stimm ready",
+		ru = "Стим готов",
+	},
 }
