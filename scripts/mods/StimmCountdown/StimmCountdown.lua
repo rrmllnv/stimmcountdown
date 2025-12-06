@@ -61,13 +61,8 @@ local function is_broker_class(player)
 		return false
 	end
 
-	local profile = player:profile()
-	if not profile then
-		return false
-	end
-
-	local archetype = profile.archetype
-	return archetype and archetype.name == "broker"
+	local archetype_name = player:archetype_name()
+	return archetype_name == "broker"
 end
 
 -- Найти баф и получить оставшееся время
@@ -113,17 +108,18 @@ mod:hook_safe("HudElementPlayerWeapon", "update", function(self, dt, t, ui_rende
 		return
 	end
 
-	local player = data.player
-	if not player or not is_broker_class(player) then
+	local player = Managers.player:local_player(1)
+	if not player or not player:unit_is_alive() then
+		widget.content.visible = false
+		return
+	end
+
+	if not is_broker_class(player) then
 		widget.content.visible = false
 		return
 	end
 
 	local player_unit = player.player_unit
-	if not player_unit or not ALIVE[player_unit] then
-		widget.content.visible = false
-		return
-	end
 
 	local buff_extension = ScriptUnit.has_extension(player_unit, "buff_system")
 	if not buff_extension then
